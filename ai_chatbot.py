@@ -1,12 +1,19 @@
+from groq import Groq
 import os
 from dotenv import load_dotenv
-from google import genai
 
 load_dotenv()
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+response = client.chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[
+        {"role": "user", "content": "Hello"}
+    ]
 )
+
+print(response.choices[0].message.content)
 
 
 def ask_ai(question):
@@ -52,11 +59,48 @@ HELP
 
 User:
 {question}
+
+If the user asks to compare two locations, return ONLY:
+
+COMPARE:Location1,Location2
+
+Example:
+
+COMPARE:Chennai,Mumbai
+
+Do not explain anything else.
+
+If the user asks:
+- Which location is safest?
+- Safest place
+- Safe location
+
+Return ONLY:
+
+SAFEST
+
+If the user asks:
+- help
+- what can you do
+- commands
+- examples
+- how to use
+
+Return ONLY:
+
+HELP
 """
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+       ]
     )
+
+    return response.choices[0].message.content
 
     return response.text.strip()
