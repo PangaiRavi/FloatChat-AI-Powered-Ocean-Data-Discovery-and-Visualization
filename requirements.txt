@@ -2,5 +2,7 @@ streamlit
 pandas
 plotly
 requests
-google-genai
 python-dotenv
+groq
+openpyxl
+matplotlib
