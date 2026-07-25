@@ -590,19 +590,24 @@ with st.container(border=True):
     c3.metric("Average Wave Height", f"{filtered_df['WaveHeight'].mean():.2f} m")
     c4.metric("Records", len(filtered_df))
 
+
 # -------------------------------------------------
 # CHATBOT
 # -------------------------------------------------
 with st.container(border=True):
     st.markdown('<span class="section-eyebrow">Assistant</span>', unsafe_allow_html=True)
+
     header_col, btn_col = st.columns([5, 1])
+
     with header_col:
         st.subheader("💬 FloatChat Assistant")
+
     with btn_col:
         if st.button("🗑 Clear Chat"):
             st.session_state.messages = []
             st.rerun()
 
+    # Display previous messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
@@ -610,24 +615,68 @@ with st.container(border=True):
     query = st.chat_input("Ask anything about ocean data...")
 
     if query:
-        st.session_state.messages.append({"role": "user", "content": query})
+
+        # User message
+        st.session_state.messages.append(
+            {"role": "user", "content": query}
+        )
+
         with st.chat_message("user"):
             st.write(query)
 
+        # Ask AI
         answer = ask_ai(query)
 
-        # ----------------------------
-        # Show Location
-        # ----------------------------
-        if answer.startswith("SHOW_LOCATION:"):
+        # ---------------------------------
+        # Compare Two Locations
+        # ---------------------------------
+        if answer.startswith("COMPARE:"):
+
+            cities = answer.replace("COMPARE:", "").split(",")
+            cities = [c.strip() for c in cities]
+
+            compare_df = df[df["Location"].isin(cities)]
+
+            if compare_df.empty:
+
+                with st.chat_message("assistant"):
+                    st.write("No comparison data available.")
+
+            else:
+
+                message = f"📊 Comparing ocean data for {cities[0]} and {cities[1]}"
+
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": message}
+                )
+
+                with st.chat_message("assistant"):
+                    st.write(message)
+
+                st.dataframe(compare_df, width="stretch")
+                st.plotly_chart(plot_temperature(compare_df), width="stretch")
+                st.plotly_chart(plot_salinity(compare_df), width="stretch")
+                st.plotly_chart(plot_wave(compare_df), width="stretch")
+
+        # ---------------------------------
+        # Show Single Location
+        # ---------------------------------
+        elif answer.startswith("SHOW_LOCATION:"):
+
             city = answer.split(":")[1].strip()
+
             city_df = df[df["Location"] == city]
 
             if not city_df.empty:
+
                 ocean = city_df.iloc[0]["Ocean"]
+
                 message = f"🌊 Showing ocean details for {city} ({ocean})."
 
-                st.session_state.messages.append({"role": "assistant", "content": message})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": message}
+                )
+
                 with st.chat_message("assistant"):
                     st.write(message)
 
@@ -635,87 +684,169 @@ with st.container(border=True):
                 st.plotly_chart(plot_temperature(city_df), width="stretch")
                 st.plotly_chart(plot_salinity(city_df), width="stretch")
                 st.plotly_chart(plot_wave(city_df), width="stretch")
+
             else:
+
                 with st.chat_message("assistant"):
                     st.write("No data available for this location.")
+
+        # ---------------------------------
+        # Safest Location
+        # ---------------------------------
+        elif answer == "SAFEST":
+
+            safe = df.loc[df["WaveHeight"].idxmin()]
+
+            message = (
+                f"🛟 Based on today's ocean data,\n\n"
+                f"**{safe['Location']} ({safe['Ocean']})** appears to be the safest location.\n\n"
+                f"🌊 Wave Height: {safe['WaveHeight']} m\n"
+                f"🌡 SST: {safe['SST']} °C\n"
+                f"🧂 Salinity: {safe['Salinity']}"
+            )
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": message}
+            )
+
+            with st.chat_message("assistant"):
+                st.markdown(message)
+
+        # ---------------------------------
+        # Help
+        # ---------------------------------
+        elif answer == "HELP":
+
+            help_text = """
+# 🌊 FloatChat Help
+
+### 📍 Location
+• Show Chennai data
+• Show Mumbai data
+• Ocean data for Kochi
+
+### 📊 Comparison
+• Compare Chennai and Mumbai
+• Compare Kochi and Goa
+
+### 🌡 Temperature
+• Highest temperature
+• Lowest temperature
+• Average SST
+
+### 🌊 Waves
+• Highest wave height
+• Lowest wave height
+
+### 🧂 Salinity
+• Highest salinity
+• Average salinity
+
+### 🧠 Insights
+• Which location is safest?
+• Summarize today's ocean conditions
+"""
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": help_text}
+            )
+
+            with st.chat_message("assistant"):
+                st.markdown(help_text)
+
+        # ---------------------------------
+        # Highest SST
+        # ---------------------------------
+        elif answer == "HIGHEST:SST":
+
+            row = df.loc[df["SST"].idxmax()]
+
+            message = (
+                f"🌡 The warmest water is at **{row['Location']} ({row['Ocean']})**.\n\n"
+                f"Temperature: **{row['SST']} °C**"
+            )
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": message}
+            )
+
+            with st.chat_message("assistant"):
+                st.markdown(message)
+
+        # ---------------------------------
+        # Highest Salinity
+        # ---------------------------------
+        elif answer == "HIGHEST:Salinity":
+
+            row = df.loc[df["Salinity"].idxmax()]
+
+            message = (
+                f"🧂 The highest salinity is at **{row['Location']} ({row['Ocean']})**.\n\n"
+                f"Salinity: **{row['Salinity']} PSU**"
+            )
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": message}
+            )
+
+            with st.chat_message("assistant"):
+                st.markdown(message)
+
+        # ---------------------------------
+        # Highest Wave Height
+        # ---------------------------------
+        elif answer == "HIGHEST:WaveHeight":
+
+            row = df.loc[df["WaveHeight"].idxmax()]
+
+            message = (
+                f"🌊 The highest wave height is at **{row['Location']} ({row['Ocean']})**.\n\n"
+                f"Wave Height: **{row['WaveHeight']} m**"
+            )
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": message}
+            )
+
+            with st.chat_message("assistant"):
+                st.markdown(message)
+
+        # ---------------------------------
+        # Default AI Response
+        # ---------------------------------
         else:
-            st.session_state.messages.append({"role": "assistant", "content": answer})
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": answer}
+            )
+
             with st.chat_message("assistant"):
                 st.write(answer)
+    # -------------------------------------------------
+    # OCEAN HEALTH STATUS
+    # -------------------------------------------------
+    with st.container(border=True):
+        st.markdown('<span class="section-eyebrow">Condition Check</span>', unsafe_allow_html=True)
+        st.subheader("🌍 Ocean Health Status")
 
-# -------------------------------------------------
-# OCEAN INSIGHTS
-# -------------------------------------------------
-with st.container(border=True):
-    st.markdown('<span class="section-eyebrow">Highlights</span>', unsafe_allow_html=True)
-    st.subheader("🧠 Ocean Insights")
+        health_df = filtered_df.copy()
 
-    max_temp = filtered_df.loc[filtered_df["SST"].fillna(-999).idxmax()]
-    min_temp = filtered_df.loc[filtered_df["SST"].fillna(999).idxmin()]
-    max_wave = filtered_df.loc[filtered_df["WaveHeight"].fillna(-999).idxmax()]
-    max_salinity = filtered_df.loc[filtered_df["Salinity"].fillna(-999).idxmax()]
+        def health_status(row):
+            if row["SST"] < 29 and row["WaveHeight"] < 2 and row["Salinity"] >= 34:
+                return "🟢 Excellent"
+            elif row["SST"] < 30 and row["WaveHeight"] < 2.5:
+                return "🟡 Good"
+            elif row["SST"] < 31:
+                return "🟠 Moderate"
+            else:
+                return "🔴 Poor"
 
-    ic1, ic2 = st.columns(2)
-    with ic1:
-        st.success(f"🔥 Highest Temperature: {max_temp['Location']} ({max_temp['SST']} °C)")
-        st.warning(f"🌊 Highest Wave Height: {max_wave['Location']} ({max_wave['WaveHeight']} m)")
-    with ic2:
-        st.info(f"❄️ Lowest Temperature: {min_temp['Location']} ({min_temp['SST']} °C)")
-        st.write(f"🧂 Highest Salinity: {max_salinity['Location']} ({max_salinity['Salinity']})")
+        health_df["Health Status"] = health_df.apply(health_status, axis=1)
 
-# -------------------------------------------------
-# OCEAN SUMMARY
-# -------------------------------------------------
-with st.container(border=True):
-    st.markdown('<span class="section-eyebrow">Statistics</span>', unsafe_allow_html=True)
-    st.subheader("📈 Ocean Data Summary")
-
-    summary_table = pd.DataFrame({
-        "Parameter": ["Sea Surface Temperature", "Salinity", "Wave Height"],
-        "Minimum": [
-            filtered_df["SST"].min(),
-            filtered_df["Salinity"].min(),
-            filtered_df["WaveHeight"].min()
-        ],
-        "Maximum": [
-            filtered_df["SST"].max(),
-            filtered_df["Salinity"].max(),
-            filtered_df["WaveHeight"].max()
-        ],
-        "Average": [
-            round(filtered_df["SST"].mean(), 2),
-            round(filtered_df["Salinity"].mean(), 2),
-            round(filtered_df["WaveHeight"].mean(), 2)
-        ]
-    })
-
-    st.dataframe(summary_table, width="stretch")
-
-# -------------------------------------------------
-# OCEAN HEALTH STATUS
-# -------------------------------------------------
-with st.container(border=True):
-    st.markdown('<span class="section-eyebrow">Condition Check</span>', unsafe_allow_html=True)
-    st.subheader("🌍 Ocean Health Status")
-
-    health_df = filtered_df.copy()
-
-    def health_status(row):
-        if row["SST"] < 29 and row["WaveHeight"] < 2 and row["Salinity"] >= 34:
-            return "🟢 Excellent"
-        elif row["SST"] < 30 and row["WaveHeight"] < 2.5:
-            return "🟡 Good"
-        elif row["SST"] < 31:
-            return "🟠 Moderate"
-        else:
-            return "🔴 Poor"
-
-    health_df["Health Status"] = health_df.apply(health_status, axis=1)
-
-    st.dataframe(
-        health_df[["Date", "Location", "SST", "Salinity", "WaveHeight", "Health Status"]],
-        width="stretch"
-    )
+        st.dataframe(
+            health_df[["Date", "Location", "SST", "Salinity", "WaveHeight", "Health Status"]],
+            width="stretch"
+        )
 
 # -------------------------------------------------
 # OCEAN ALERTS
